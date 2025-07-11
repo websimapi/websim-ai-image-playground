@@ -4,7 +4,6 @@ import * as THREE from 'three';
 const fileInput = document.getElementById('file-input');
 const promptInput = document.getElementById('prompt-input');
 const generateBtn = document.getElementById('generate-btn');
-const dbUploadBtn = document.getElementById('db-upload-btn');
 
 const imagePreviewContainer = document.getElementById('image-preview-container');
 const imagePreview = document.getElementById('image-preview');
@@ -20,8 +19,7 @@ const logContainers = {
 };
 
 // --- State ---
-let currentImageDataUrl = null;
-let currentImageBlob = null; // Store the image Blob/File for DB upload
+let currentImageUrl = null;
 let threeAnimationId = null; // To stop previous animation render loops
 const sceneState = {
     renderer: null,
@@ -34,6 +32,10 @@ const sceneState = {
 function log(containerKey, message, type = 'info') {
     const container = logContainers[containerKey];
     if (!container) return;
+    // Clear initial message if it exists
+    if (container.querySelector('i')) {
+        container.innerHTML = '';
+    }
     const entry = document.createElement('span');
     entry.className = `log-entry log-${type}`;
     entry.textContent = message;
@@ -65,41 +67,21 @@ function clearOutputs() {
         cancelAnimationFrame(threeAnimationId);
         threeAnimationId = null;
     }
-    document.getElementById('scene-container').innerHTML = '';
+    const sceneContainer = document.getElementById('scene-container');
+    if(sceneContainer) sceneContainer.innerHTML = '';
+    
     // Clear AI description
-    document.getElementById('ai-description-output').textContent = '';
+    const aiOutput = document.getElementById('ai-description-output');
+    if(aiOutput) aiOutput.textContent = '';
+
     // Disable download buttons
     downloadBtns.forEach(btn => btn.disabled = true);
-    // Disable DB upload button
-    dbUploadBtn.disabled = true;
-}
-
-// --- NEW: Prepare image and enable upload ---
-function prepareImageForTesting(blob, dataUrl) {
-    currentImageBlob = blob;
-    currentImageDataUrl = dataUrl;
-
-    // Show image preview
-    imagePreview.src = dataUrl;
-    imagePreviewContainer.classList.remove('hidden');
-
-    // Enable the DB upload button and hide the tests for now
-    dbUploadBtn.disabled = false;
-    testsContainer.classList.add('hidden');
-    clearOutputs();
-    clearLogs();
 }
 
 // --- Core Logic ---
-async function handleImage(imageUrl) {
-    // Show tests container
-    testsContainer.classList.remove('hidden');
-
-    // Reset previous results, but keep DB logs
-    const dbLogs = logContainers.db.innerHTML;
-    clearOutputs();
-    clearLogs();
-    logContainers.db.innerHTML = dbLogs;
+async function runAllTests(imageUrl) {
+    // Update the preview image to use the final URL. This helps with CORS.
+    imagePreview.src = imageUrl;
 
     // Run all tests with the new URL
     runCanvasDisplayTest(imageUrl);
@@ -113,12 +95,12 @@ fileInput.addEventListener('change', (e) => {
     const file = e.target.files[0];
     if (file) {
         promptInput.value = ''; // Clear other input
-        const reader = new FileReader();
-        reader.onload = (event) => {
-            // New: Prepare image instead of directly handling it
-            prepareImageForTesting(file, event.target.result);
-        };
-        reader.readAsDataURL(file);
+        generateBtn.disabled = true; // Disable other button
+        fileInput.disabled = true;
+        processAndRunTests(file).finally(() => {
+            generateBtn.disabled = false;
+            fileInput.disabled = false;
+        });
     }
 });
 
@@ -131,54 +113,22 @@ generateBtn.addEventListener('click', async () => {
 
     fileInput.value = ''; // Clear other input
     generateBtn.disabled = true;
+    fileInput.disabled = true;
     generateBtn.textContent = 'Generating...';
 
     try {
         const result = await websim.imageGen({ prompt });
-        // We need to fetch the image and convert to DataURL to avoid CORS issues on canvas/webgl
         const response = await fetch(result.url);
         const blob = await response.blob();
-        const reader = new FileReader();
-        reader.onload = (event) => {
-            // New: Prepare image instead of directly handling it
-            prepareImageForTesting(blob, event.target.result);
-        };
-        reader.readAsDataURL(blob);
+        await processAndRunTests(blob);
 
     } catch (error) {
         console.error('Image generation failed:', error);
         alert('Failed to generate image. Please try again.');
     } finally {
         generateBtn.disabled = false;
+        fileInput.disabled = false;
         generateBtn.textContent = 'Generate';
-    }
-});
-
-dbUploadBtn.addEventListener('click', async () => {
-    if (!currentImageBlob) {
-        alert("No image selected to upload.");
-        return;
-    }
-
-    dbUploadBtn.disabled = true;
-    dbUploadBtn.textContent = 'Uploading...';
-    const dbLogKey = 'db';
-    log(dbLogKey, 'Starting database upload...', 'wait');
-
-    try {
-        const url = await websim.upload(currentImageBlob);
-        log(dbLogKey, `Upload successful. URL: ${url}`, 'success');
-        
-        // Use the new URL to run tests
-        await handleImage(url);
-
-    } catch (error) {
-        console.error('Database upload failed:', error);
-        log(dbLogKey, `Database upload failed: ${error.message}`, 'fail');
-        alert('Failed to upload image to the database.');
-    } finally {
-        dbUploadBtn.textContent = 'Upload Current Image & Run Tests';
-        // The button remains disabled until a new image is chosen
     }
 });
 
@@ -371,7 +321,7 @@ async function runAIProcessingTest(imageUrl) {
         });
         
         const description = completion.content;
-        sceneState.description = description; // Store in state
+        sceneState.description = description; // Store state
         outputDiv.textContent = `"${description}"`;
         log(key, 'AI response received successfully.');
         log(key, `Description: ${description}`, 'success');
@@ -381,5 +331,35 @@ async function runAIProcessingTest(imageUrl) {
         console.error('AI processing failed:', error);
         outputDiv.textContent = 'Could not get AI description.';
         log(key, 'Failed to get a response from the AI.', 'fail');
+    }
+}
+
+async function processAndRunTests(imageBlob) {
+    clearOutputs();
+    clearLogs();
+    
+    // Show image preview container and tests container immediately
+    imagePreviewContainer.classList.remove('hidden');
+    testsContainer.classList.remove('hidden');
+
+    const dbLogKey = 'db';
+    log(dbLogKey, 'Starting database upload...', 'wait');
+
+    try {
+        const url = await websim.upload(imageBlob);
+        log(dbLogKey, `Upload successful. URL: ${url}`, 'success');
+        
+        currentImageUrl = url;
+
+        // Show a temporary local preview while the public URL loads
+        imagePreview.src = URL.createObjectURL(imageBlob);
+
+        // Use the new URL to run tests
+        await runAllTests(url);
+
+    } catch (error) {
+        console.error('Database upload or testing failed:', error);
+        log(dbLogKey, `Processing failed: ${error.message}`, 'fail');
+        alert('Failed to upload image and run tests.');
     }
 }
