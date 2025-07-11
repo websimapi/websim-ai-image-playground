@@ -125,10 +125,31 @@ canvas, #scene-container, #ai-description-output {
     border: 1px dashed var(--border-color);
     border-radius: 4px;
     background-color: #f8f9fa;
+    margin-bottom: 12px; /* Space between content and button */
 }
 
 #edit-canvas {
     cursor: crosshair;
+}
+
+.download-btn {
+    padding: 8px 12px;
+    background-color: var(--success-color);
+    color: white;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: background-color 0.3s ease;
+    align-self: flex-start;
+}
+
+.download-btn:hover, .download-btn:focus {
+    background-color: #218838;
+}
+
+.download-btn:disabled {
+    background-color: #81c784;
+    cursor: not-allowed;
 }
 
 .log-box {
@@ -141,7 +162,7 @@ canvas, #scene-container, #ai-description-output {
     word-break: break-all;
     font-size: 0.8em;
     flex-grow: 1;
-    margin-top: 16px;
+    margin-top: 12px; /* Space between button and log box */
     overflow-y: auto;
     max-height: 200px;
 }
@@ -184,4 +205,3 @@ canvas, #scene-container, #ai-description-output {
     align-items: center;
     text-align: center;
 }
-

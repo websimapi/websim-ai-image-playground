@@ -8,6 +8,7 @@ const generateBtn = document.getElementById('generate-btn');
 const imagePreviewContainer = document.getElementById('image-preview-container');
 const imagePreview = document.getElementById('image-preview');
 const testsContainer = document.getElementById('tests-container');
+const downloadBtns = document.querySelectorAll('.download-btn');
 
 const logContainers = {
     display: document.getElementById('log-display'),
@@ -19,6 +20,12 @@ const logContainers = {
 // --- State ---
 let currentImageDataUrl = null;
 let threeAnimationId = null; // To stop previous animation render loops
+const sceneState = {
+    renderer: null,
+    scene: null,
+    camera: null,
+    description: '',
+};
 
 // --- Utility Functions ---
 function log(containerKey, message, type = 'info') {
@@ -52,6 +59,8 @@ function clearOutputs() {
     document.getElementById('scene-container').innerHTML = '';
     // Clear AI description
     document.getElementById('ai-description-output').textContent = '';
+    // Disable download buttons
+    downloadBtns.forEach(btn => btn.disabled = true);
 }
 
 // --- Core Logic ---
@@ -118,6 +127,57 @@ generateBtn.addEventListener('click', async () => {
     }
 });
 
+testsContainer.addEventListener('click', (e) => {
+    if (e.target.classList.contains('download-btn')) {
+        const example = e.target.dataset.example;
+        handleDownload(example);
+    }
+});
+
+// --- Download Handler ---
+function handleDownload(example) {
+    const link = document.createElement('a');
+    
+    switch(example) {
+        case 'display': {
+            const canvas = document.getElementById('display-canvas');
+            link.href = canvas.toDataURL('image/png');
+            link.download = 'canvas-display.png';
+            break;
+        }
+        case 'edit': {
+            const canvas = document.getElementById('edit-canvas');
+            link.href = canvas.toDataURL('image/png');
+            link.download = 'canvas-edit.png';
+            break;
+        }
+        case '3d': {
+            if (sceneState.renderer) {
+                // Ensure the latest frame is rendered before capture
+                sceneState.renderer.render(sceneState.scene, sceneState.camera);
+                link.href = sceneState.renderer.domElement.toDataURL('image/png');
+                link.download = '3d-scene.png';
+            }
+            break;
+        }
+        case 'ai': {
+            if (sceneState.description) {
+                const blob = new Blob([sceneState.description], { type: 'text/plain' });
+                link.href = URL.createObjectURL(blob);
+                link.download = 'ai-description.txt';
+            }
+            break;
+        }
+    }
+    
+    if (link.href) {
+        link.click();
+        if (link.href.startsWith('blob:')) {
+            URL.revokeObjectURL(link.href); // Clean up blob URL
+        }
+    }
+}
+
 // --- Test Case 1: Display on Canvas ---
 function runCanvasDisplayTest() {
     const key = 'display';
@@ -132,6 +192,7 @@ function runCanvasDisplayTest() {
         canvas.height = img.height;
         ctx.drawImage(img, 0, 0);
         log(key, 'Image drawn to canvas.', 'success');
+        document.querySelector('.download-btn[data-example="display"]').disabled = false;
     };
     img.onerror = () => log(key, 'Failed to load image object.', 'fail');
     img.src = currentImageDataUrl;
@@ -159,6 +220,7 @@ function runCanvasEditTest() {
         
         log(key, 'Drawing event listeners attached.', 'success');
         log(key, 'Test setup complete. Try drawing on the image!', 'info');
+        document.querySelector('.download-btn[data-example="edit"]').disabled = false;
     };
     img.onerror = () => log(key, 'Failed to load image for editing.', 'fail');
     img.src = currentImageDataUrl;
@@ -180,7 +242,6 @@ function runCanvasEditTest() {
     }
 }
 
-
 // --- Test Case 3: 3D Scene ---
 function run3DSceneTest() {
     const key = '3d';
@@ -188,13 +249,16 @@ function run3DSceneTest() {
     const container = document.getElementById('scene-container');
 
     const scene = new THREE.Scene();
+    sceneState.scene = scene; // Store in state
     log(key, 'Scene created.');
 
     const camera = new THREE.PerspectiveCamera(75, container.clientWidth / container.clientHeight, 0.1, 1000);
     camera.position.z = 1.5;
+    sceneState.camera = camera; // Store in state
     log(key, 'Perspective camera created.');
     
-    const renderer = new THREE.WebGLRenderer({ antialias: true });
+    const renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
+    sceneState.renderer = renderer; // Store in state
     renderer.setSize(container.clientWidth, container.clientHeight);
     container.appendChild(renderer.domElement);
     log(key, 'WebGL renderer initialized and attached to DOM.');
@@ -220,12 +284,12 @@ function run3DSceneTest() {
         }
         animate();
         log(key, 'Animation loop started.', 'success');
+        document.querySelector('.download-btn[data-example="3d"]').disabled = false;
     }, undefined, () => {
         log(key, 'Failed to load texture.', 'fail');
     });
     log(key, 'Texture loader initiated.');
 }
-
 
 // --- Test Case 4: AI Processing ---
 async function runAIProcessingTest() {
@@ -235,6 +299,7 @@ async function runAIProcessingTest() {
     
     outputDiv.textContent = 'Asking the AI to describe the image...';
     log(key, 'Sending image to vision model...', 'wait');
+    sceneState.description = ''; // Reset description
 
     try {
         const completion = await websim.chat.completions.create({
@@ -248,9 +313,11 @@ async function runAIProcessingTest() {
         });
         
         const description = completion.content;
+        sceneState.description = description; // Store in state
         outputDiv.textContent = `"${description}"`;
         log(key, 'AI response received successfully.');
         log(key, `Description: ${description}`, 'success');
+        document.querySelector('.download-btn[data-example="ai"]').disabled = false;
 
     } catch (error) {
         console.error('AI processing failed:', error);
@@ -258,4 +325,3 @@ async function runAIProcessingTest() {
         log(key, 'Failed to get a response from the AI.', 'fail');
     }
 }
-
