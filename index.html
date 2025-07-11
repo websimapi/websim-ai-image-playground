@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Image Playground</title>
+    <link rel="stylesheet" href="style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Roboto+Mono:wght@400;700&family=Roboto:wght@400;700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <header>
+        <h1>AI Image Playground</h1>
+        <p>Upload an image or generate one with AI to see it used in different examples.</p>
+    </header>
+
+    <div class="input-container">
+        <div class="input-group">
+            <label for="file-input">1. Upload an Image</label>
+            <input type="file" id="file-input" accept="image/*">
+        </div>
+        <div class="separator">OR</div>
+        <div class="input-group">
+            <label for="prompt-input">2. Generate an Image with AI</label>
+            <input type="text" id="prompt-input" placeholder="e.g., a photorealistic robot reading a book">
+            <button id="generate-btn">Generate</button>
+        </div>
+    </div>
+
+    <div id="image-preview-container" class="hidden">
+        <h2>Source Image</h2>
+        <img id="image-preview" src="" alt="Selected/Generated Image">
+    </div>
+
+    <main id="tests-container" class="hidden">
+        <div class="test-case">
+            <h2>Example 1: Display on Canvas</h2>
+            <canvas id="display-canvas"></canvas>
+            <pre class="log-box" id="log-display"></pre>
+        </div>
+
+        <div class="test-case">
+            <h2>Example 2: Edit on Canvas</h2>
+            <canvas id="edit-canvas"></canvas>
+            <pre class="log-box" id="log-edit"></pre>
+        </div>
+
+        <div class="test-case">
+            <h2>Example 3: Use in a 3D Scene</h2>
+            <div id="scene-container"></div>
+            <pre class="log-box" id="log-3d"></pre>
+        </div>
+
+        <div class="test-case">
+            <h2>Example 4: AI Image Description</h2>
+            <div id="ai-description-output"></div>
+            <pre class="log-box" id="log-ai"></pre>
+        </div>
+    </main>
+    
+    <script type="importmap">
+    {
+      "imports": {
+        "three": "https://cdn.jsdelivr.net/npm/three@0.166.1/build/three.module.js",
+        "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.166.1/examples/jsm/"
+      }
+    }
+    </script>
+    <script type="module" src="script.js"></script>
+<script defer src="https://static.cloudflareinsights.com/beacon.min.js/v8c78df7c7c0f484497ecbca7046644da1771523124516" integrity="sha512-8DS7rgIrAmghBFwoOTujcf6D9rXvH8xm8JQ1Ja01h9QX8EzXldiszufYa4IFfKdLUKTTrnSFXLDkUEOTrZQ8Qg==" data-cf-beacon='{"version":"2024.11.0","token":"4c6229722a6346bc8eb5cb0e5eae5d41","server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
+</body>
+</html>
+

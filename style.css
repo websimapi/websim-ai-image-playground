@@ -1,0 +1,187 @@
+:root {
+    --primary-color: #007bff;
+    --success-color: #28a745;
+    --fail-color: #dc3545;
+    --info-color: #17a2b8;
+    --bg-color: #f8f9fa;
+    --text-color: #212529;
+    --border-color: #dee2e6;
+    --card-bg: #ffffff;
+}
+
+body {
+    font-family: 'Roboto', sans-serif;
+    background-color: var(--bg-color);
+    color: var(--text-color);
+    margin: 0;
+    padding: 24px;
+    line-height: 1.6;
+}
+
+header {
+    text-align: center;
+    margin-bottom: 24px;
+}
+
+h1 {
+    color: var(--primary-color);
+}
+
+.input-container {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    align-items: center;
+    gap: 24px;
+    background-color: var(--card-bg);
+    padding: 24px;
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    margin-bottom: 24px;
+}
+
+.input-group {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.input-group label {
+    font-weight: bold;
+    color: #495057;
+}
+
+.separator {
+    font-weight: bold;
+    color: var(--border-color);
+}
+
+input[type="text"], input[type="file"] {
+    padding: 8px;
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+}
+
+button {
+    padding: 10px 15px;
+    background-color: var(--primary-color);
+    color: white;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: background-color 0.3s ease;
+}
+
+button:hover, button:focus {
+    background-color: #0056b3;
+}
+
+button:disabled {
+    background-color: #a0c7f7;
+    cursor: not-allowed;
+}
+
+#image-preview-container {
+    text-align: center;
+    margin-bottom: 24px;
+    padding: 16px;
+    background-color: var(--card-bg);
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+#image-preview {
+    max-width: 100%;
+    max-height: 300px;
+    border-radius: 4px;
+    border: 1px solid var(--border-color);
+}
+
+#tests-container {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+    gap: 24px;
+}
+
+.test-case {
+    background-color: var(--card-bg);
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+}
+
+.test-case h2 {
+    color: var(--primary-color);
+    margin-top: 0;
+    border-bottom: 1px solid var(--border-color);
+    padding-bottom: 8px;
+}
+
+canvas, #scene-container, #ai-description-output {
+    width: 100%;
+    aspect-ratio: 4 / 3;
+    border: 1px dashed var(--border-color);
+    border-radius: 4px;
+    background-color: #f8f9fa;
+}
+
+#edit-canvas {
+    cursor: crosshair;
+}
+
+.log-box {
+    font-family: 'Roboto Mono', monospace;
+    background-color: #212529;
+    color: #f8f9fa;
+    padding: 12px;
+    border-radius: 4px;
+    white-space: pre-wrap;
+    word-break: break-all;
+    font-size: 0.8em;
+    flex-grow: 1;
+    margin-top: 16px;
+    overflow-y: auto;
+    max-height: 200px;
+}
+
+.log-box .log-entry {
+    display: block;
+    margin-bottom: 4px;
+}
+
+.log-box .log-success::before {
+    content: '✅ [PASS] ';
+    color: var(--success-color);
+}
+
+.log-box .log-fail::before {
+    content: '❌ [FAIL] ';
+    color: var(--fail-color);
+}
+
+.log-box .log-info::before {
+    content: 'ℹ️ [INFO] ';
+    color: var(--info-color);
+}
+
+.log-box .log-wait::before {
+    content: '⏳ [WAIT] ';
+    color: #ffc107;
+}
+
+.hidden {
+    display: none;
+}
+
+#ai-description-output {
+    padding: 16px;
+    font-style: italic;
+    color: #495057;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    text-align: center;
+}
+
