@@ -43,8 +43,13 @@ function log(containerKey, message, type = 'info') {
 
 function clearLogs() {
     for (const key in logContainers) {
-        logContainers[key].innerHTML = '';
-        if (key === 'db') logContainers[key].innerHTML = '<i>Logs for database upload will appear here...</i>';
+        // This check prevents the 'Cannot set properties of null' error if an element is missing.
+        if (logContainers[key]) { 
+            logContainers[key].innerHTML = '';
+            if (key === 'db') {
+                logContainers[key].innerHTML = '<i>Logs for database upload will appear here...</i>';
+            }
+        }
     }
 }
 
