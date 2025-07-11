@@ -4,6 +4,7 @@ import * as THREE from 'three';
 const fileInput = document.getElementById('file-input');
 const promptInput = document.getElementById('prompt-input');
 const generateBtn = document.getElementById('generate-btn');
+const dbUploadBtn = document.getElementById('db-upload-btn');
 
 const imagePreviewContainer = document.getElementById('image-preview-container');
 const imagePreview = document.getElementById('image-preview');
@@ -15,10 +16,12 @@ const logContainers = {
     edit: document.getElementById('log-edit'),
     '3d': document.getElementById('log-3d'),
     ai: document.getElementById('log-ai'),
+    db: document.getElementById('log-db'),
 };
 
 // --- State ---
 let currentImageDataUrl = null;
+let currentImageBlob = null; // Store the image Blob/File for DB upload
 let threeAnimationId = null; // To stop previous animation render loops
 const sceneState = {
     renderer: null,
@@ -41,6 +44,7 @@ function log(containerKey, message, type = 'info') {
 function clearLogs() {
     for (const key in logContainers) {
         logContainers[key].innerHTML = '';
+        if (key === 'db') logContainers[key].innerHTML = '<i>Logs for database upload will appear here...</i>';
     }
 }
 
@@ -61,26 +65,42 @@ function clearOutputs() {
     document.getElementById('ai-description-output').textContent = '';
     // Disable download buttons
     downloadBtns.forEach(btn => btn.disabled = true);
+    // Disable DB upload button
+    dbUploadBtn.disabled = true;
+}
+
+// --- NEW: Prepare image and enable upload ---
+function prepareImageForTesting(blob, dataUrl) {
+    currentImageBlob = blob;
+    currentImageDataUrl = dataUrl;
+
+    // Show image preview
+    imagePreview.src = dataUrl;
+    imagePreviewContainer.classList.remove('hidden');
+
+    // Enable the DB upload button and hide the tests for now
+    dbUploadBtn.disabled = false;
+    testsContainer.classList.add('hidden');
+    clearOutputs();
+    clearLogs();
 }
 
 // --- Core Logic ---
-async function handleImage(imageDataUrl) {
-    currentImageDataUrl = imageDataUrl;
-    
-    // Show image preview and tests
-    imagePreview.src = imageDataUrl;
-    imagePreviewContainer.classList.remove('hidden');
+async function handleImage(imageUrl) {
+    // Show tests container
     testsContainer.classList.remove('hidden');
 
-    // Reset previous results
-    clearLogs();
+    // Reset previous results, but keep DB logs
+    const dbLogs = logContainers.db.innerHTML;
     clearOutputs();
+    clearLogs();
+    logContainers.db.innerHTML = dbLogs;
 
-    // Run all tests
-    runCanvasDisplayTest();
-    runCanvasEditTest();
-    run3DSceneTest();
-    runAIProcessingTest();
+    // Run all tests with the new URL
+    runCanvasDisplayTest(imageUrl);
+    runCanvasEditTest(imageUrl);
+    run3DSceneTest(imageUrl);
+    runAIProcessingTest(imageUrl);
 }
 
 // --- Event Listeners ---
@@ -90,7 +110,8 @@ fileInput.addEventListener('change', (e) => {
         promptInput.value = ''; // Clear other input
         const reader = new FileReader();
         reader.onload = (event) => {
-            handleImage(event.target.result);
+            // New: Prepare image instead of directly handling it
+            prepareImageForTesting(file, event.target.result);
         };
         reader.readAsDataURL(file);
     }
@@ -114,7 +135,8 @@ generateBtn.addEventListener('click', async () => {
         const blob = await response.blob();
         const reader = new FileReader();
         reader.onload = (event) => {
-            handleImage(event.target.result);
+            // New: Prepare image instead of directly handling it
+            prepareImageForTesting(blob, event.target.result);
         };
         reader.readAsDataURL(blob);
 
@@ -124,6 +146,34 @@ generateBtn.addEventListener('click', async () => {
     } finally {
         generateBtn.disabled = false;
         generateBtn.textContent = 'Generate';
+    }
+});
+
+dbUploadBtn.addEventListener('click', async () => {
+    if (!currentImageBlob) {
+        alert("No image selected to upload.");
+        return;
+    }
+
+    dbUploadBtn.disabled = true;
+    dbUploadBtn.textContent = 'Uploading...';
+    const dbLogKey = 'db';
+    log(dbLogKey, 'Starting database upload...', 'wait');
+
+    try {
+        const url = await websim.upload(currentImageBlob);
+        log(dbLogKey, `Upload successful. URL: ${url}`, 'success');
+        
+        // Use the new URL to run tests
+        await handleImage(url);
+
+    } catch (error) {
+        console.error('Database upload failed:', error);
+        log(dbLogKey, `Database upload failed: ${error.message}`, 'fail');
+        alert('Failed to upload image to the database.');
+    } finally {
+        dbUploadBtn.textContent = 'Upload Current Image & Run Tests';
+        // The button remains disabled until a new image is chosen
     }
 });
 
@@ -179,13 +229,14 @@ function handleDownload(example) {
 }
 
 // --- Test Case 1: Display on Canvas ---
-function runCanvasDisplayTest() {
+function runCanvasDisplayTest(imageUrl) {
     const key = 'display';
     log(key, 'Starting canvas display test...');
     const canvas = document.getElementById('display-canvas');
     const ctx = canvas.getContext('2d');
     
     const img = new Image();
+    img.crossOrigin = "Anonymous"; // Allow cross-origin image loading
     img.onload = () => {
         log(key, 'Image object loaded successfully in memory.');
         canvas.width = img.width;
@@ -195,12 +246,12 @@ function runCanvasDisplayTest() {
         document.querySelector('.download-btn[data-example="display"]').disabled = false;
     };
     img.onerror = () => log(key, 'Failed to load image object.', 'fail');
-    img.src = currentImageDataUrl;
+    img.src = imageUrl;
     log(key, 'Image source set. Waiting for load event...');
 }
 
 // --- Test Case 2: Edit on Canvas ---
-function runCanvasEditTest() {
+function runCanvasEditTest(imageUrl) {
     const key = 'edit';
     log(key, 'Starting canvas edit test...');
     const canvas = document.getElementById('edit-canvas');
@@ -208,6 +259,7 @@ function runCanvasEditTest() {
     let isDrawing = false;
 
     const img = new Image();
+    img.crossOrigin = "Anonymous"; // Allow cross-origin image loading
     img.onload = () => {
         log(key, 'Image loaded and drawn as background.');
         canvas.width = img.width;
@@ -223,7 +275,7 @@ function runCanvasEditTest() {
         document.querySelector('.download-btn[data-example="edit"]').disabled = false;
     };
     img.onerror = () => log(key, 'Failed to load image for editing.', 'fail');
-    img.src = currentImageDataUrl;
+    img.src = imageUrl;
     log(key, 'Image source set. Waiting for load...');
 
     function draw(e) {
@@ -243,7 +295,7 @@ function runCanvasEditTest() {
 }
 
 // --- Test Case 3: 3D Scene ---
-function run3DSceneTest() {
+function run3DSceneTest(imageUrl) {
     const key = '3d';
     log(key, 'Starting 3D scene test...');
     const container = document.getElementById('scene-container');
@@ -264,7 +316,8 @@ function run3DSceneTest() {
     log(key, 'WebGL renderer initialized and attached to DOM.');
     
     const loader = new THREE.TextureLoader();
-    loader.load(currentImageDataUrl, (texture) => {
+    loader.setCrossOrigin("Anonymous"); // Allow cross-origin texture loading
+    loader.load(imageUrl, (texture) => {
         log(key, 'Texture loaded successfully.');
         texture.colorSpace = THREE.SRGBColorSpace;
         
@@ -292,7 +345,7 @@ function run3DSceneTest() {
 }
 
 // --- Test Case 4: AI Processing ---
-async function runAIProcessingTest() {
+async function runAIProcessingTest(imageUrl) {
     const key = 'ai';
     const outputDiv = document.getElementById('ai-description-output');
     log(key, 'Starting AI image processing test...');
@@ -307,7 +360,7 @@ async function runAIProcessingTest() {
                 role: 'user',
                 content: [
                     { type: 'text', text: 'Describe what you see in this image in one sentence.' },
-                    { type: 'image_url', image_url: { url: currentImageDataUrl } },
+                    { type: 'image_url', image_url: { url: imageUrl } },
                 ],
             }],
         });

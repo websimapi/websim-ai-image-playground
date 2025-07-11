@@ -54,6 +54,8 @@ h1 {
 .separator {
     font-weight: bold;
     color: var(--border-color);
+    align-self: flex-end;
+    padding-bottom: 10px;
 }
 
 input[type="text"], input[type="file"] {
@@ -103,13 +105,21 @@ button:disabled {
     gap: 24px;
 }
 
-.test-case {
+.test-case:not(.db-log-case) {
     background-color: var(--card-bg);
     border-radius: 8px;
     box-shadow: 0 2px 4px rgba(0,0,0,0.1);
     padding: 16px;
     display: flex;
     flex-direction: column;
+}
+
+.db-log-case {
+    background-color: var(--card-bg);
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    padding: 16px;
+    grid-column: 1 / -1; /* Span full width */
 }
 
 .test-case h2 {
