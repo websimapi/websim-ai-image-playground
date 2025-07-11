@@ -5,6 +5,7 @@ const fileInput = document.getElementById('file-input');
 const promptInput = document.getElementById('prompt-input');
 const generateBtn = document.getElementById('generate-btn');
 
+const dbUploadBtn = document.getElementById('db-upload-btn');
 const imagePreviewContainer = document.getElementById('image-preview-container');
 const imagePreview = document.getElementById('image-preview');
 const testsContainer = document.getElementById('tests-container');
@@ -19,7 +20,10 @@ const logContainers = {
 };
 
 // --- State ---
-let currentImageUrl = null;
+let currentImage = {
+    blob: null,
+    url: null,
+};
 let threeAnimationId = null; // To stop previous animation render loops
 const sceneState = {
     renderer: null,
@@ -41,6 +45,12 @@ function log(containerKey, message, type = 'info') {
     entry.textContent = message;
     container.appendChild(entry);
     container.scrollTop = container.scrollHeight;
+}
+
+function enableDbUploadButton() {
+    if (currentImage.blob) {
+        dbUploadBtn.disabled = false;
+    }
 }
 
 function clearLogs() {
@@ -74,20 +84,29 @@ function clearOutputs() {
     const aiOutput = document.getElementById('ai-description-output');
     if(aiOutput) aiOutput.textContent = '';
 
-    // Disable download buttons
+    // Disable download buttons and db upload button
     downloadBtns.forEach(btn => btn.disabled = true);
+    dbUploadBtn.disabled = true;
+}
+
+function blobToDataURL(blob) {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onloadend = () => resolve(reader.result);
+        reader.onerror = reject;
+        reader.readAsDataURL(blob);
+    });
 }
 
 // --- Core Logic ---
-async function runAllTests(imageUrl) {
-    // Update the preview image to use the final URL. This helps with CORS.
-    imagePreview.src = imageUrl;
-
+async function runAllTests(imageUrl, imageDataUrl) {
+    log('db', 'Running all tests with the uploaded image...');
+    
     // Run all tests with the new URL
     runCanvasDisplayTest(imageUrl);
     runCanvasEditTest(imageUrl);
     run3DSceneTest(imageUrl);
-    runAIProcessingTest(imageUrl);
+    runAIProcessingTest(imageDataUrl); // Pass data URL to AI test
 }
 
 // --- Event Listeners ---
@@ -95,12 +114,15 @@ fileInput.addEventListener('change', (e) => {
     const file = e.target.files[0];
     if (file) {
         promptInput.value = ''; // Clear other input
-        generateBtn.disabled = true; // Disable other button
-        fileInput.disabled = true;
-        processAndRunTests(file).finally(() => {
-            generateBtn.disabled = false;
-            fileInput.disabled = false;
-        });
+        
+        // Hide test container until user clicks upload
+        testsContainer.classList.add('hidden');
+        imagePreviewContainer.classList.remove('hidden');
+        imagePreview.src = URL.createObjectURL(file);
+
+        currentImage.blob = file;
+        currentImage.url = null;
+        enableDbUploadButton();
     }
 });
 
@@ -113,22 +135,38 @@ generateBtn.addEventListener('click', async () => {
 
     fileInput.value = ''; // Clear other input
     generateBtn.disabled = true;
-    fileInput.disabled = true;
+    promptInput.disabled = true;
     generateBtn.textContent = 'Generating...';
 
     try {
         const result = await websim.imageGen({ prompt });
         const response = await fetch(result.url);
         const blob = await response.blob();
-        await processAndRunTests(blob);
+        
+        currentImage.blob = blob;
+        currentImage.url = null;
+
+        imagePreviewContainer.classList.remove('hidden');
+        testsContainer.classList.add('hidden'); // Hide tests until upload
+        imagePreview.src = URL.createObjectURL(blob);
+        
+        enableDbUploadButton();
 
     } catch (error) {
         console.error('Image generation failed:', error);
         alert('Failed to generate image. Please try again.');
     } finally {
         generateBtn.disabled = false;
-        fileInput.disabled = false;
+        promptInput.disabled = false;
         generateBtn.textContent = 'Generate';
+    }
+});
+
+dbUploadBtn.addEventListener('click', async () => {
+    if (currentImage.blob) {
+        await processAndRunTests(currentImage.blob);
+    } else {
+        alert("No image selected or generated to upload.");
     }
 });
 
@@ -284,6 +322,11 @@ function run3DSceneTest(imageUrl) {
         scene.add(cube);
         log(key, 'Mesh (cube) created and added to scene.');
 
+        // Stop previous animation loop if it exists
+        if (threeAnimationId) {
+            cancelAnimationFrame(threeAnimationId);
+        }
+
         function animate() {
             threeAnimationId = requestAnimationFrame(animate);
             cube.rotation.x += 0.005;
@@ -300,7 +343,7 @@ function run3DSceneTest(imageUrl) {
 }
 
 // --- Test Case 4: AI Processing ---
-async function runAIProcessingTest(imageUrl) {
+async function runAIProcessingTest(imageDataUrl) {
     const key = 'ai';
     const outputDiv = document.getElementById('ai-description-output');
     log(key, 'Starting AI image processing test...');
@@ -315,7 +358,7 @@ async function runAIProcessingTest(imageUrl) {
                 role: 'user',
                 content: [
                     { type: 'text', text: 'Describe what you see in this image in one sentence.' },
-                    { type: 'image_url', image_url: { url: imageUrl } },
+                    { type: 'image_url', image_url: { url: imageDataUrl } },
                 ],
             }],
         });
@@ -330,7 +373,7 @@ async function runAIProcessingTest(imageUrl) {
     } catch (error) {
         console.error('AI processing failed:', error);
         outputDiv.textContent = 'Could not get AI description.';
-        log(key, 'Failed to get a response from the AI.', 'fail');
+        log(key, `Failed to get a response from the AI. Error: ${error.message}`, 'fail');
     }
 }
 
@@ -338,8 +381,10 @@ async function processAndRunTests(imageBlob) {
     clearOutputs();
     clearLogs();
     
-    // Show image preview container and tests container immediately
-    imagePreviewContainer.classList.remove('hidden');
+    dbUploadBtn.disabled = true;
+    dbUploadBtn.textContent = 'Uploading...';
+    
+    // Show tests container immediately
     testsContainer.classList.remove('hidden');
 
     const dbLogKey = 'db';
@@ -349,17 +394,21 @@ async function processAndRunTests(imageBlob) {
         const url = await websim.upload(imageBlob);
         log(dbLogKey, `Upload successful. URL: ${url}`, 'success');
         
-        currentImageUrl = url;
-
-        // Show a temporary local preview while the public URL loads
-        imagePreview.src = URL.createObjectURL(imageBlob);
+        currentImage.url = url;
 
         // Use the new URL to run tests
-        await runAllTests(url);
+        log(dbLogKey, 'Converting image to data URL for AI test...', 'wait');
+        const dataUrl = await blobToDataURL(imageBlob);
+        log(dbLogKey, 'Data URL created successfully.', 'success');
+        
+        await runAllTests(url, dataUrl);
 
     } catch (error) {
         console.error('Database upload or testing failed:', error);
         log(dbLogKey, `Processing failed: ${error.message}`, 'fail');
         alert('Failed to upload image and run tests.');
+    } finally {
+        dbUploadBtn.textContent = 'Upload Current Image & Run Tests';
+        enableDbUploadButton();
     }
 }
